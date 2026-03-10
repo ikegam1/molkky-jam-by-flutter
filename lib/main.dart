@@ -15,8 +15,13 @@ void main() {
               top: 40,
               left: 20,
               child: Text(
-                'Molkky JAM: Forest Stage (Mushroom Creeps)',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                'Molkky JAM: Forest Stage (Sunset Horror)',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                ),
               ),
             ),
           ],
@@ -32,14 +37,14 @@ class MolkkyJamGame extends FlameGame with TapDetector {
 
   @override
   Future<void> onLoad() async {
-    // 背景
+    // 背景グラフィック
     add(BackgroundComponent());
     
     // 主人公
     protagonist = ProtagonistComponent(characterName: 'boy_full.png');
     add(protagonist);
 
-    // キノコ人間（わらわら動くデモ）
+    // エリンギ人間（わらわら動くデモ）
     for (int i = 0; i < 20; i++) {
       add(CreatureComponent(imageName: 'mushroom_creature.png'));
     }
@@ -56,19 +61,20 @@ class MolkkyJamGame extends FlameGame with TapDetector {
   }
 }
 
-class BackgroundComponent extends PositionComponent with HasGameRef {
+class BackgroundComponent extends SpriteComponent with HasGameRef {
+  BackgroundComponent() : super(anchor: Anchor.topLeft);
+
   @override
-  void render(Canvas canvas) {
-    canvas.drawRect(
-      gameRef.size.toRect(),
-      Paint()..color = const Color(0xFF1B3022), // 深い森の緑
-    );
-    // フィールドの円
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
-    canvas.drawCircle(gameRef.size.center(Offset.zero), 150, paint);
+  Future<void> onLoad() async {
+    sprite = await gameRef.loadSprite('forest_background.png');
+    // 画面全体を覆うようにサイズを調整
+    size = gameRef.size;
+  }
+
+  @override
+  void onGameResize(Vector2 newSize) {
+    super.onGameResize(newSize);
+    size = newSize;
   }
 }
 
@@ -118,7 +124,6 @@ class CreatureComponent extends SpriteComponent with HasGameRef {
       _random.nextDouble() * gameRef.size.x,
       _random.nextDouble() * gameRef.size.y,
     );
-    // 活気がないので動きを少し遅く、不規則に
     velocity = Vector2(
       (_random.nextDouble() - 0.5) * 60,
       (_random.nextDouble() - 0.5) * 60,
