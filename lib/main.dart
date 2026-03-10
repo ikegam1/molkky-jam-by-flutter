@@ -1,25 +1,58 @@
 import 'package:flame/game.dart';
 import 'package:flame/components.dart';
+import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
 
 void main() {
-  runApp(GameWidget(game: MolkkyJamGame()));
+  runApp(
+    MaterialApp(
+      home: Scaffold(
+        body: Stack(
+          children: [
+            GameWidget(game: MolkkyJamGame()),
+            const Positioned(
+              top: 40,
+              left: 20,
+              child: Text(
+                'Molkky JAM: Forest Stage (Mushroom Creeps)',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
-class MolkkyJamGame extends FlameGame {
+class MolkkyJamGame extends FlameGame with TapDetector {
+  late ProtagonistComponent protagonist;
+  bool isBoy = true;
+
   @override
   Future<void> onLoad() async {
-    // 背景（今はプレースホルダー）
+    // 背景
     add(BackgroundComponent());
     
-    // 主人公（ダミー）
-    add(ProtagonistComponent());
+    // 主人公
+    protagonist = ProtagonistComponent(characterName: 'boy_full.png');
+    add(protagonist);
 
-    // 味方クリーチャー（わらわら動くデモ）
-    for (int i = 0; i < 10; i++) {
-      add(CreatureComponent());
+    // キノコ人間（わらわら動くデモ）
+    for (int i = 0; i < 20; i++) {
+      add(CreatureComponent(imageName: 'mushroom_creature.png'));
     }
+  }
+
+  @override
+  void onTapDown(TapDownInfo info) {
+    if (info.eventPosition.global.y < 150) {
+      isBoy = !isBoy;
+      protagonist.switchCharacter(isBoy ? 'boy_full.png' : 'girl_full.png');
+      return;
+    }
+    protagonist.targetPosition = info.eventPosition.global;
   }
 }
 
@@ -28,63 +61,76 @@ class BackgroundComponent extends PositionComponent with HasGameRef {
   void render(Canvas canvas) {
     canvas.drawRect(
       gameRef.size.toRect(),
-      Paint()..color = Colors.green.shade900,
+      Paint()..color = const Color(0xFF1B3022), // 深い森の緑
     );
+    // フィールドの円
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawCircle(gameRef.size.center(Offset.zero), 150, paint);
   }
 }
 
-class ProtagonistComponent extends PositionComponent with HasGameRef {
-  ProtagonistComponent() : super(size: Vector2(64, 64), anchor: Anchor.center);
+class ProtagonistComponent extends SpriteComponent with HasGameRef {
+  Vector2? targetPosition;
+  final double speed = 300.0;
+
+  ProtagonistComponent({required String characterName}) : super(size: Vector2(150, 200), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
+    sprite = await gameRef.loadSprite(characterName);
     position = gameRef.size / 2;
   }
 
+  void switchCharacter(String characterName) async {
+    sprite = await gameRef.loadSprite(characterName);
+  }
+
   @override
-  void render(Canvas canvas) {
-    canvas.drawCircle(
-      (size / 2).toOffset(),
-      size.x / 2,
-      Paint()..color = Colors.red,
-    );
-    // メガネとキャップのつもり
-    canvas.drawRect(Rect.fromLTWH(0, 10, size.x, 10), Paint()..color = Colors.black);
+  void update(double dt) {
+    super.update(dt);
+    final target = targetPosition;
+    if (target != null) {
+      Vector2 direction = target - position;
+      if (direction.length < 5) {
+        position = target;
+        targetPosition = null;
+      } else {
+        position += direction.normalized() * speed * dt;
+      }
+    }
   }
 }
 
-class CreatureComponent extends PositionComponent with HasGameRef {
+class CreatureComponent extends SpriteComponent with HasGameRef {
   late Vector2 velocity;
   final _random = Random();
+  final String imageName;
 
-  CreatureComponent() : super(size: Vector2(32, 32), anchor: Anchor.center);
+  CreatureComponent({required this.imageName}) : super(size: Vector2(40, 40), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
+    sprite = await gameRef.loadSprite(imageName);
     position = Vector2(
       _random.nextDouble() * gameRef.size.x,
       _random.nextDouble() * gameRef.size.y,
     );
+    // 活気がないので動きを少し遅く、不規則に
     velocity = Vector2(
-      (_random.nextDouble() - 0.5) * 100,
-      (_random.nextDouble() - 0.5) * 100,
+      (_random.nextDouble() - 0.5) * 60,
+      (_random.nextDouble() - 0.5) * 60,
     );
   }
 
   @override
   void update(double dt) {
+    super.update(dt);
     position += velocity * dt;
 
-    // 画面端で跳ね返る（わらわら感）
     if (position.x < 0 || position.x > gameRef.size.x) velocity.x *= -1;
     if (position.y < 0 || position.y > gameRef.size.y) velocity.y *= -1;
-  }
-
-  @override
-  void render(Canvas canvas) {
-    canvas.drawRect(
-      size.toRect(),
-      Paint()..color = Colors.white.withOpacity(0.7),
-    );
   }
 }
