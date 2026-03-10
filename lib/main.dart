@@ -2,33 +2,163 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:math';
 
-void main() {
-  runApp(
-    MaterialApp(
-      home: Scaffold(
-        body: Stack(
-          children: [
-            GameWidget(game: MolkkyJamGame()),
-            const Positioned(
-              top: 40,
-              left: 20,
-              child: Text(
-                'Molkky JAM: Forest Stage (Sunset Horror)',
+// ※ 実際の開発では `flutterfire configure` で生成された `firebase_options.dart` を使用しますが、
+// ここではモックとして定義、あるいは後で ikegami さんに設定していただく形にします。
+// import 'firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Firebaseの初期化（ikegamiさんの環境に合わせて firebase_options を指定する必要があります）
+  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const MolkkyJamApp());
+}
+
+class MolkkyJamApp extends StatelessWidget {
+  const MolkkyJamApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Molkky JAM',
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primarySwatch: Colors.deepOrange,
+      ),
+      home: const AuthCheckScreen(),
+    );
+  }
+}
+
+class AuthCheckScreen extends StatelessWidget {
+  const AuthCheckScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasData) {
+          return const MainGameMenu();
+        }
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  Future<void> _signInWithGoogle(BuildContext context) async {
+    try {
+      // Webデプロイを考慮し、GoogleSignIn(params) の設定が必要になる場合があります。
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      await FirebaseAuth.instance.signInWithCredential(credential);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login Failed: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/forest_background.png'),
+            fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'Molkky JAM',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
+                  fontSize: 48,
                   fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                  color: Colors.white,
+                  letterSpacing: 4,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 10)],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 50),
+              ElevatedButton.icon(
+                onPressed: () => _signInWithGoogle(context),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign in with Google'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                  textStyle: const TextStyle(fontSize: 18),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class MainGameMenu extends StatelessWidget {
+  const MainGameMenu({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Molkky JAM'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          GameWidget(game: MolkkyJamGame()),
+          Positioned(
+            top: 20,
+            left: 20,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'User: ${FirebaseAuth.instance.currentUser?.displayName ?? "Unknown"}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                const Text(
+                  'Forest Stage: Tap to Move',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class MolkkyJamGame extends FlameGame with TapDetector {
@@ -37,37 +167,27 @@ class MolkkyJamGame extends FlameGame with TapDetector {
 
   @override
   Future<void> onLoad() async {
-    // 背景グラフィック
     add(BackgroundComponent());
-    
-    // 主人公
     protagonist = ProtagonistComponent(characterName: 'boy_full.png');
     add(protagonist);
 
-    // エリンギ人間（わらわら動くデモ）
-    for (int i = 0; i < 20; i++) {
-      add(CreatureComponent(imageName: 'mushroom_creature.png'));
+    // 今回はエリンギ人間なし、キノコ5本（Backgroundに含まれるか、個別に置くか）
+    // とりあえずわらわらデモは継続
+    for (int i = 0; i < 5; i++) {
+      add(MushroomComponent());
     }
   }
 
   @override
   void onTapDown(TapDownInfo info) {
-    if (info.eventPosition.global.y < 150) {
-      isBoy = !isBoy;
-      protagonist.switchCharacter(isBoy ? 'boy_full.png' : 'girl_full.png');
-      return;
-    }
     protagonist.targetPosition = info.eventPosition.global;
   }
 }
 
 class BackgroundComponent extends SpriteComponent with HasGameRef {
-  BackgroundComponent() : super(anchor: Anchor.topLeft);
-
   @override
   Future<void> onLoad() async {
     sprite = await gameRef.loadSprite('forest_background.png');
-    // 画面全体を覆うようにサイズを調整
     size = gameRef.size;
   }
 
@@ -82,7 +202,8 @@ class ProtagonistComponent extends SpriteComponent with HasGameRef {
   Vector2? targetPosition;
   final double speed = 300.0;
 
-  ProtagonistComponent({required String characterName}) : super(size: Vector2(150, 200), anchor: Anchor.center);
+  ProtagonistComponent({required String characterName})
+      : super(size: Vector2(150, 200), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
@@ -110,32 +231,18 @@ class ProtagonistComponent extends SpriteComponent with HasGameRef {
   }
 }
 
-class CreatureComponent extends SpriteComponent with HasGameRef {
-  late Vector2 velocity;
+class MushroomComponent extends SpriteComponent with HasGameRef {
   final _random = Random();
-  final String imageName;
 
-  CreatureComponent({required this.imageName}) : super(size: Vector2(40, 40), anchor: Anchor.center);
+  MushroomComponent() : super(size: Vector2(30, 30), anchor: Anchor.center);
 
   @override
   Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite(imageName);
+    // mushroom_creature.png を毒キノコとして再利用、あるいは別途生成
+    sprite = await gameRef.loadSprite('mushroom_creature.png');
     position = Vector2(
       _random.nextDouble() * gameRef.size.x,
       _random.nextDouble() * gameRef.size.y,
     );
-    velocity = Vector2(
-      (_random.nextDouble() - 0.5) * 60,
-      (_random.nextDouble() - 0.5) * 60,
-    );
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    position += velocity * dt;
-
-    if (position.x < 0 || position.x > gameRef.size.x) velocity.x *= -1;
-    if (position.y < 0 || position.y > gameRef.size.y) velocity.y *= -1;
   }
 }
