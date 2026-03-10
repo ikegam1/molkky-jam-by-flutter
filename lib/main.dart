@@ -7,14 +7,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:math';
 
-// ※ 実際の開発では `flutterfire configure` で生成された `firebase_options.dart` を使用しますが、
-// ここではモックとして定義、あるいは後で ikegami さんに設定していただく形にします。
-// import 'firebase_options.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebaseの初期化（ikegamiさんの環境に合わせて firebase_options を指定する必要があります）
-  // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Firebaseの初期化は後で行うため、一旦コメントアウト
+  // try { await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); } catch (e) {}
   runApp(const MolkkyJamApp());
 }
 
@@ -29,28 +25,20 @@ class MolkkyJamApp extends StatelessWidget {
         brightness: Brightness.dark,
         primarySwatch: Colors.deepOrange,
       ),
-      home: const AuthCheckScreen(),
+      // 認証を一旦スキップして直接ゲームメニューへ進むように変更
+      home: const MainGameMenu(),
     );
   }
 }
 
+// 認証チェック画面（現在は不使用だが、将来のために保持）
 class AuthCheckScreen extends StatelessWidget {
   const AuthCheckScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
-        if (snapshot.hasData) {
-          return const MainGameMenu();
-        }
-        return const LoginScreen();
-      },
-    );
+    // 常にログイン済みとして扱うか、直接遷移させる
+    return const MainGameMenu();
   }
 }
 
@@ -58,23 +46,10 @@ class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   Future<void> _signInWithGoogle(BuildContext context) async {
-    try {
-      // Webデプロイを考慮し、GoogleSignIn(params) の設定が必要になる場合があります。
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      await FirebaseAuth.instance.signInWithCredential(credential);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login Failed: $e')),
-      );
-    }
+    // 実装は後ほど
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Login feature is coming soon!')),
+    );
   }
 
   @override
@@ -131,24 +106,29 @@ class MainGameMenu extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () {
+              // ログアウト処理（現在は単にメッセージ表示）
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Guest user cannot logout.')),
+              );
+            },
           ),
         ],
       ),
       body: Stack(
         children: [
           GameWidget(game: MolkkyJamGame()),
-          Positioned(
+          const Positioned(
             top: 20,
             left: 20,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'User: ${FirebaseAuth.instance.currentUser?.displayName ?? "Unknown"}',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  'User: Guest Player',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                 ),
-                const Text(
+                Text(
                   'Forest Stage: Tap to Move',
                   style: TextStyle(color: Colors.white70),
                 ),
@@ -163,7 +143,6 @@ class MainGameMenu extends StatelessWidget {
 
 class MolkkyJamGame extends FlameGame with TapDetector {
   late ProtagonistComponent protagonist;
-  bool isBoy = true;
 
   @override
   Future<void> onLoad() async {
@@ -171,8 +150,6 @@ class MolkkyJamGame extends FlameGame with TapDetector {
     protagonist = ProtagonistComponent(characterName: 'boy_full.png');
     add(protagonist);
 
-    // 今回はエリンギ人間なし、キノコ5本（Backgroundに含まれるか、個別に置くか）
-    // とりあえずわらわらデモは継続
     for (int i = 0; i < 5; i++) {
       add(MushroomComponent());
     }
@@ -211,10 +188,6 @@ class ProtagonistComponent extends SpriteComponent with HasGameRef {
     position = gameRef.size / 2;
   }
 
-  void switchCharacter(String characterName) async {
-    sprite = await gameRef.loadSprite(characterName);
-  }
-
   @override
   void update(double dt) {
     super.update(dt);
@@ -238,7 +211,6 @@ class MushroomComponent extends SpriteComponent with HasGameRef {
 
   @override
   Future<void> onLoad() async {
-    // mushroom_creature.png を毒キノコとして再利用、あるいは別途生成
     sprite = await gameRef.loadSprite('mushroom_creature.png');
     position = Vector2(
       _random.nextDouble() * gameRef.size.x,
