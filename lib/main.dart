@@ -2,15 +2,12 @@ import 'package:flame/game.dart';
 import 'package:flame/components.dart';
 import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:math';
+import 'models/game_models.dart';
+import 'logic/game_logic.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebaseの初期化は後で行うため、一旦コメントアウト
-  // try { await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform); } catch (e) {}
   runApp(const MolkkyJamApp());
 }
 
@@ -24,115 +21,223 @@ class MolkkyJamApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.deepOrange,
+        useMaterial3: true,
       ),
-      // 認証を一旦スキップして直接ゲームメニューへ進むように変更
       home: const MainGameMenu(),
     );
   }
 }
 
-// 認証チェック画面（現在は不使用だが、将来のために保持）
-class AuthCheckScreen extends StatelessWidget {
-  const AuthCheckScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // 常にログイン済みとして扱うか、直接遷移させる
-    return const MainGameMenu();
-  }
-}
-
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
-
-  Future<void> _signInWithGoogle(BuildContext context) async {
-    // 実装は後ほど
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Login feature is coming soon!')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/forest_background.png'),
-            fit: BoxFit.cover,
-            colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
-          ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Molkky JAM',
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 4,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 10)],
-                ),
-              ),
-              const SizedBox(height: 50),
-              ElevatedButton.icon(
-                onPressed: () => _signInWithGoogle(context),
-                icon: const Icon(Icons.login),
-                label: const Text('Sign in with Google'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  textStyle: const TextStyle(fontSize: 18),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MainGameMenu extends StatelessWidget {
+class MainGameMenu extends StatefulWidget {
   const MainGameMenu({super.key});
 
   @override
+  State<MainGameMenu> createState() => _MainGameMenuState();
+}
+
+class _MainGameMenuState extends State<MainGameMenu> {
+  final List<Player> _players = [
+    Player(id: '1', name: 'Nori-kun', initialOrder: 0),
+    Player(id: '2', name: 'Micchan', initialOrder: 1),
+  ];
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Molkky JAM'),
+      appBar: AppBar(title: const Text('Molkky JAM')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Main Menu', style: TextStyle(fontSize: 24)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                final match = MolkkyMatch(
+                  players: _players.map((p) {
+                    p.resetForNewSet();
+                    p.setsWon = 0;
+                    p.setFinalScores = [];
+                    p.matchScoreHistory = [];
+                    return p;
+                  }).toList(),
+                  limit: 1,
+                  type: MatchType.fixedSets,
+                );
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (c) => GameScreen(match: match),
+                  ),
+                );
+              },
+              child: const Text('Start 1-Set Match'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class GameScreen extends StatefulWidget {
+  final MolkkyMatch match;
+  const GameScreen({super.key, required this.match});
+
+  @override
+  State<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends State<GameScreen> {
+  int currentPlayerIndex = 0;
+  List<int> selectedSkitels = [];
+  bool isSetFinished = false;
+  late MolkkyJamGame game;
+
+  @override
+  void initState() {
+    super.initState();
+    game = MolkkyJamGame();
+  }
+
+  void _onSkitelTap(int num) {
+    if (isSetFinished) return;
+    setState(() {
+      if (selectedSkitels.contains(num)) {
+        selectedSkitels.remove(num);
+      } else {
+        selectedSkitels.add(num);
+      }
+    });
+  }
+
+  void _submitThrow() {
+    if (isSetFinished) return;
+    final player = widget.match.players[currentPlayerIndex];
+    setState(() {
+      GameLogic.processThrow(player, selectedSkitels, widget.match);
+      
+      if (player.currentScore == widget.match.targetScore) {
+        isSetFinished = true;
+        player.setsWon++;
+        _showWinnerDialog(player);
+      } else {
+        selectedSkitels.clear();
+        _nextPlayer();
+      }
+    });
+  }
+
+  void _nextPlayer() {
+    int start = currentPlayerIndex;
+    do {
+      currentPlayerIndex = (currentPlayerIndex + 1) % widget.match.players.length;
+    } while (widget.match.players[currentPlayerIndex].isDisqualified && currentPlayerIndex != start);
+  }
+
+  void _showWinnerDialog(Player winner) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Winner!'),
+        content: Text('${winner.name} wins this set!'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              // ログアウト処理（現在は単にメッセージ表示）
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Guest user cannot logout.')),
-              );
-            },
+          TextButton(
+            onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+            child: const Text('Finish'),
           ),
         ],
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentPlayer = widget.match.players[currentPlayerIndex];
+    
+    return Scaffold(
       body: Stack(
         children: [
-          GameWidget(game: MolkkyJamGame()),
-          const Positioned(
-            top: 20,
+          // Flame Game Background
+          GameWidget(game: game),
+          
+          // Score Overlay
+          Positioned(
+            top: 40,
             left: 20,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'User: Guest Player',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  'Forest Stage: Tap to Move',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ],
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: widget.match.players.map((p) => Column(
+                  children: [
+                    Text(p.name, style: TextStyle(
+                      fontWeight: p == currentPlayer ? FontWeight.bold : FontWeight.normal,
+                      color: p == currentPlayer ? Colors.orange : Colors.white,
+                    )),
+                    Text('${p.currentScore} / 50', style: const TextStyle(fontSize: 20)),
+                    if (p.isDisqualified) const Text('DQ', style: TextStyle(color: Colors.red)),
+                  ],
+                )).toList(),
+              ),
+            ),
+          ),
+
+          // Controls Overlay
+          Positioned(
+            bottom: 20,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Turn: ${currentPlayer.name}', style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 10),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemCount: 12,
+                    itemBuilder: (c, i) {
+                      final num = i + 1;
+                      final isSelected = selectedSkitels.contains(num);
+                      return ElevatedButton(
+                        onPressed: () => _onSkitelTap(num),
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          backgroundColor: isSelected ? Colors.orange : Colors.grey[800],
+                        ),
+                        child: Text('$num'),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _submitThrow,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                      backgroundColor: Colors.blue,
+                    ),
+                    child: Text(selectedSkitels.isEmpty ? 'Miss (0 pts)' : 'Confirm (${selectedSkitels.length == 1 ? selectedSkitels.first : selectedSkitels.length} pts)'),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -141,23 +246,13 @@ class MainGameMenu extends StatelessWidget {
   }
 }
 
-class MolkkyJamGame extends FlameGame with TapDetector {
-  late ProtagonistComponent protagonist;
-
+class MolkkyJamGame extends FlameGame {
   @override
   Future<void> onLoad() async {
     add(BackgroundComponent());
-    protagonist = ProtagonistComponent(characterName: 'boy_full.png');
-    add(protagonist);
-
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 10; i++) {
       add(MushroomComponent());
     }
-  }
-
-  @override
-  void onTapDown(TapDownInfo info) {
-    protagonist.targetPosition = info.eventPosition.global;
   }
 }
 
@@ -167,46 +262,10 @@ class BackgroundComponent extends SpriteComponent with HasGameRef {
     sprite = await gameRef.loadSprite('forest_background.png');
     size = gameRef.size;
   }
-
-  @override
-  void onGameResize(Vector2 newSize) {
-    super.onGameResize(newSize);
-    size = newSize;
-  }
-}
-
-class ProtagonistComponent extends SpriteComponent with HasGameRef {
-  Vector2? targetPosition;
-  final double speed = 300.0;
-
-  ProtagonistComponent({required String characterName})
-      : super(size: Vector2(150, 200), anchor: Anchor.center);
-
-  @override
-  Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite(characterName);
-    position = gameRef.size / 2;
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    final target = targetPosition;
-    if (target != null) {
-      Vector2 direction = target - position;
-      if (direction.length < 5) {
-        position = target;
-        targetPosition = null;
-      } else {
-        position += direction.normalized() * speed * dt;
-      }
-    }
-  }
 }
 
 class MushroomComponent extends SpriteComponent with HasGameRef {
   final _random = Random();
-
   MushroomComponent() : super(size: Vector2(30, 30), anchor: Anchor.center);
 
   @override
