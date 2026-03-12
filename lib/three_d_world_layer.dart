@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
 
 class ThreeDWorldLayer extends StatefulWidget {
   const ThreeDWorldLayer({
@@ -24,10 +23,10 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
   Timer? _loop;
 
   // model_viewer は Flutter Web の場合、assets 配下が assets/assets/ で配信されるためこのURLを使用
-  static const String localEringiModel = 'assets/assets/models/eringi_human.glb';
-  static const String fallbackModel =
-      'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
-  static const bool useLocalModel = true;
+  static const String frontSprite = 'assets/images/eringi_front.png';
+  static const String backSprite = 'assets/images/eringi_back.png';
+  static const String sideSprite = 'assets/images/eringi_right.png';
+  static const String diagSprite = 'assets/images/eringi_diag.png';
 
   @override
   void initState() {
@@ -103,6 +102,30 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
     return a + d * t;
   }
 
+  ({String sprite, bool flipX}) _selectSprite(double headingRad) {
+    // 0度=右, 90度=下, -90度=上（Flutter座標系を考慮）
+    final deg = (headingRad * 180 / pi + 360) % 360;
+
+    // right/front-left/back-right/right etc
+    if (deg >= 337.5 || deg < 22.5) {
+      return (sprite: sideSprite, flipX: false); // right
+    } else if (deg < 67.5) {
+      return (sprite: diagSprite, flipX: false); // down-right
+    } else if (deg < 112.5) {
+      return (sprite: frontSprite, flipX: false); // down/front
+    } else if (deg < 157.5) {
+      return (sprite: diagSprite, flipX: true); // down-left
+    } else if (deg < 202.5) {
+      return (sprite: sideSprite, flipX: true); // left
+    } else if (deg < 247.5) {
+      return (sprite: diagSprite, flipX: true); // up-left
+    } else if (deg < 292.5) {
+      return (sprite: backSprite, flipX: false); // up/back
+    } else {
+      return (sprite: diagSprite, flipX: false); // up-right
+    }
+  }
+
   @override
   void dispose() {
     _loop?.cancel();
@@ -119,35 +142,26 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
         ...movers.map((m) {
           final depthScale = (0.55 + m.y * 0.75) * m.bodyScale;
           final bob = sin(m.bob) * (2.0 + m.bodyScale * 2.0);
-          final headingDeg = (m.renderHeading * 180 / pi) + 90;
-          final walkPitchDeg = sin(m.gaitPhase) * 11.0;
-          final walkRollDeg = cos(m.gaitPhase) * 4.0;
+          final walkRoll = cos(m.gaitPhase) * 0.08;
+          final selected = _selectSprite(m.renderHeading);
 
           return Align(
             alignment: Alignment(m.x * 2 - 1, m.y * 2 - 1),
             child: Transform.translate(
               offset: Offset(0, bob),
-              child: SizedBox(
-                width: 78 * depthScale,
-                height: 78 * depthScale,
-                child: IgnorePointer(
-                  child: ModelViewer(
-                    src: useLocalModel ? localEringiModel : fallbackModel,
-                    relatedCss: '''
-                    model-viewer{background-color:transparent;}
-                    ''',
-                    alt: 'Eringi 3D Creature',
-                    cameraControls: false,
-                    autoRotate: false,
-                    disableZoom: true,
-                    disablePan: true,
-                    ar: false,
-                    autoPlay: true,
-                    backgroundColor: Colors.transparent,
-                    loading: Loading.eager,
-                    cameraOrbit: '0deg 78deg 2.0m',
-                    orientation:
-                        '${walkPitchDeg.toStringAsFixed(1)}deg ${headingDeg.toStringAsFixed(1)}deg ${walkRollDeg.toStringAsFixed(1)}deg',
+              child: Transform.rotate(
+                angle: walkRoll,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.diagonal3Values(selected.flipX ? -1 : 1, 1, 1),
+                  child: SizedBox(
+                    width: 86 * depthScale,
+                    height: 86 * depthScale,
+                    child: Image.asset(
+                      selected.sprite,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
               ),
@@ -163,7 +177,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
               padding: const EdgeInsets.all(10),
               color: Colors.black54,
               child: const Text(
-                '3D World: 群れ徘徊 + 向き連動(進行方向) + 疑似歩行アニメ\n※ assets/models/eringi_human.glb を使用中',
+                'Sprite World: 8方向向き切替 + 群れ徘徊 + 歩行ゆらぎ\n(front/back/side/diag を進行方向で自動切替)',
                 style: TextStyle(color: Colors.white),
               ),
             ),
