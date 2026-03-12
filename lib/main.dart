@@ -1,11 +1,8 @@
-import 'package:flame/game.dart';
-import 'package:flame/components.dart';
-import 'package:flame/input.dart';
 import 'package:flutter/material.dart';
-import 'dart:math';
 import 'models/game_models.dart';
 import 'logic/game_logic.dart';
 import 'three_d_demo_screen.dart';
+import 'three_d_world_layer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -103,13 +100,6 @@ class _GameScreenState extends State<GameScreen> {
   int currentPlayerIndex = 0;
   List<int> selectedSkitels = [];
   bool isSetFinished = false;
-  late MolkkyJamGame game;
-
-  @override
-  void initState() {
-    super.initState();
-    game = MolkkyJamGame();
-  }
 
   void _onSkitelTap(int num) {
     if (isSetFinished) return;
@@ -170,8 +160,7 @@ class _GameScreenState extends State<GameScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Flame Game Background
-          GameWidget(game: game),
+          const ThreeDWorldLayer(creatureCount: 10),
           
           // Score Overlay
           Positioned(
@@ -257,119 +246,3 @@ class _GameScreenState extends State<GameScreen> {
   }
 }
 
-class MolkkyJamGame extends FlameGame {
-  @override
-  Future<void> onLoad() async {
-    add(BackgroundComponent());
-
-    // 固定配置: 毒キノコ 5本
-    for (int i = 0; i < 5; i++) {
-      add(PoisonMushroomComponent());
-    }
-
-    // わらわら移動: 3D風キノコ人間
-    for (int i = 0; i < 14; i++) {
-      add(MushroomHuman3DComponent());
-    }
-  }
-}
-
-class BackgroundComponent extends SpriteComponent with HasGameRef {
-  @override
-  Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite('forest_background.png');
-    size = gameRef.size;
-  }
-
-  @override
-  void onGameResize(Vector2 newSize) {
-    super.onGameResize(newSize);
-    size = newSize;
-  }
-}
-
-class PoisonMushroomComponent extends SpriteComponent with HasGameRef {
-  final _random = Random();
-
-  PoisonMushroomComponent() : super(size: Vector2(24, 24), anchor: Anchor.center);
-
-  @override
-  Future<void> onLoad() async {
-    sprite = await gameRef.loadSprite('mushroom_creature.png');
-    // 画面下寄りに固定配置（地面っぽく）
-    position = Vector2(
-      20 + _random.nextDouble() * (gameRef.size.x - 40),
-      gameRef.size.y * (0.65 + _random.nextDouble() * 0.30),
-    );
-    opacity = 0.9;
-  }
-}
-
-class MushroomHuman3DComponent extends PositionComponent with HasGameRef {
-  final _random = Random();
-  late SpriteComponent body;
-  late CircleComponent shadow;
-  late Vector2 velocity;
-  late double baseY;
-  double bobTime = 0;
-
-  MushroomHuman3DComponent() : super(anchor: Anchor.center);
-
-  @override
-  Future<void> onLoad() async {
-    baseY = 80 + _random.nextDouble() * (gameRef.size.y - 200);
-    position = Vector2(
-      40 + _random.nextDouble() * (gameRef.size.x - 80),
-      baseY,
-    );
-
-    // Yが下ほど少し大きく見せて擬似3D感
-    final depthScale = 0.65 + (position.y / gameRef.size.y) * 0.55;
-    size = Vector2(42, 58) * depthScale;
-
-    shadow = CircleComponent(
-      radius: size.x * 0.22,
-      paint: Paint()..color = Colors.black.withOpacity(0.30),
-      anchor: Anchor.center,
-      position: Vector2(size.x * 0.5, size.y * 0.95),
-    );
-    add(shadow);
-
-    body = SpriteComponent(
-      sprite: await gameRef.loadSprite('mushroom_human_3d.png'),
-      size: size,
-      anchor: Anchor.center,
-      position: size / 2,
-    );
-    add(body);
-
-    velocity = Vector2(
-      (_random.nextDouble() - 0.5) * 45,
-      (_random.nextDouble() - 0.5) * 32,
-    );
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-
-    bobTime += dt * (1.5 + _random.nextDouble() * 0.2);
-    final bobOffset = sin(bobTime * 3.0) * 2.8;
-
-    position += velocity * dt;
-
-    if (position.x < 12 || position.x > gameRef.size.x - 12) velocity.x *= -1;
-    if (position.y < gameRef.size.y * 0.35 || position.y > gameRef.size.y * 0.93) velocity.y *= -1;
-
-    // 深度スケーリングを毎フレーム更新
-    final depthScale = 0.65 + (position.y / gameRef.size.y) * 0.55;
-    final targetSize = Vector2(42, 58) * depthScale;
-    size = targetSize;
-    body.size = targetSize;
-    body.position = targetSize / 2 + Vector2(0, bobOffset);
-
-    shadow.radius = targetSize.x * 0.22;
-    shadow.position = Vector2(targetSize.x * 0.5, targetSize.y * 0.95);
-    shadow.scale = Vector2.all(1.0 - (bobOffset.abs() / 20));
-  }
-}
