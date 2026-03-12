@@ -67534,7 +67534,7 @@ n=a.b
 n===$&&A.a()
 m=a.c
 s=78*((0.55+k*0.75)*s)
-s=A.aj2(A.tV(new A.uA("assets/models/eringi_human.glb","Eringi 3D Creature",B.Da,!1,!1,!0,!0,!1,B.c.P(o*180/3.141592653589793+90,1)+"deg 78deg 2.0m",B.F,"                      model-viewer{background-color:transparent;}\n                      ",l),!0,l),s,s)
+s=A.aj2(A.tV(new A.uA("assets/assets/models/eringi_human.glb","Eringi 3D Creature",B.Da,!1,!1,!0,!0,!1,B.c.P(o*180/3.141592653589793+90,1)+"deg 78deg 2.0m",B.F,"                      model-viewer{background-color:transparent;}\n                      ",l),!0,l),s,s)
 return new A.hd(new A.dj(n*2-1,m*2-1),l,l,A.ajn(new A.iY(A.auv(p*0.06),B.Y,!0,l,s,l),new A.n(0,r*(2+q*2))),l)},
 $S:447}
 A.q9.prototype={}
