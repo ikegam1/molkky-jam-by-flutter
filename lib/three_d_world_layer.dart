@@ -23,7 +23,8 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
   late final List<_Mover> movers;
   Timer? _loop;
 
-  static const String localEringiModel = 'assets/models/eringi_human.glb';
+  // model_viewer は Flutter Web の場合、assets 配下が assets/assets/ で配信されるためこのURLを使用
+  static const String localEringiModel = 'assets/assets/models/eringi_human.glb';
   static const String fallbackModel =
       'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
   static const bool useLocalModel = true;
