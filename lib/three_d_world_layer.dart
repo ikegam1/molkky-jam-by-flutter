@@ -90,9 +90,17 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
       me.bob += dt * (2.0 + me.gaitSpeed);
       me.gaitPhase += dt * me.gaitSpeed * 3.0;
       me.heading = atan2(me.vy, me.vx);
+      me.renderHeading = _lerpAngle(me.renderHeading, me.heading, 0.14);
     }
 
     setState(() {});
+  }
+
+  double _lerpAngle(double a, double b, double t) {
+    var d = b - a;
+    while (d > pi) d -= 2 * pi;
+    while (d < -pi) d += 2 * pi;
+    return a + d * t;
   }
 
   @override
@@ -111,9 +119,9 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
         ...movers.map((m) {
           final depthScale = (0.55 + m.y * 0.75) * m.bodyScale;
           final bob = sin(m.bob) * (2.0 + m.bodyScale * 2.0);
-          final headingDeg = (m.heading * 180 / pi) + 90;
-          final walkPitchDeg = sin(m.gaitPhase) * 8.0;
-          final walkRollDeg = cos(m.gaitPhase) * 3.0;
+          final headingDeg = (m.renderHeading * 180 / pi) + 90;
+          final walkPitchDeg = sin(m.gaitPhase) * 11.0;
+          final walkRollDeg = cos(m.gaitPhase) * 4.0;
 
           return Align(
             alignment: Alignment(m.x * 2 - 1, m.y * 2 - 1),
@@ -137,7 +145,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
                     autoPlay: true,
                     backgroundColor: Colors.transparent,
                     loading: Loading.eager,
-                    cameraOrbit: '0deg 75deg 2.1m',
+                    cameraOrbit: '0deg 78deg 2.0m',
                     orientation:
                         '${walkPitchDeg.toStringAsFixed(1)}deg ${headingDeg.toStringAsFixed(1)}deg ${walkRollDeg.toStringAsFixed(1)}deg',
                   ),
@@ -173,14 +181,15 @@ class _Mover {
     vx = (r.nextDouble() - 0.5) * 0.12;
     vy = (r.nextDouble() - 0.5) * 0.12;
     bob = r.nextDouble() * pi * 2;
-    heading = 0;
+    heading = atan2(vy, vx);
+    renderHeading = heading;
     gaitPhase = r.nextDouble() * pi * 2;
     gaitSpeed = 1.4 + r.nextDouble() * 1.8;
     bodyScale = 0.85 + r.nextDouble() * 0.45;
   }
 
   final int seed;
-  late double x, y, vx, vy, bob, heading;
+  late double x, y, vx, vy, bob, heading, renderHeading;
   late double gaitPhase;
   late double gaitSpeed;
   late double bodyScale;
