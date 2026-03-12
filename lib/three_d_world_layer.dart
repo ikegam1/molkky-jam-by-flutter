@@ -86,7 +86,8 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
       me.x = me.x.clamp(0.06, 0.94);
       me.y = me.y.clamp(0.34, 0.95);
 
-      me.bob += dt * (2.3 + me.seed * 0.02);
+      me.bob += dt * (2.0 + me.gaitSpeed);
+      me.gaitPhase += dt * me.gaitSpeed * 3.0;
       me.heading = atan2(me.vy, me.vx);
     }
 
@@ -107,17 +108,20 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
           child: Image.asset('assets/images/forest_background.png', fit: BoxFit.cover),
         ),
         ...movers.map((m) {
-          final depthScale = 0.55 + m.y * 0.75;
-          final bob = sin(m.bob) * 3.5;
+          final depthScale = (0.55 + m.y * 0.75) * m.bodyScale;
+          final bob = sin(m.bob) * (2.0 + m.bodyScale * 2.0);
+          final lean = sin(m.gaitPhase) * 0.06;
+          final headingDeg = (m.heading * 180 / pi) + 90;
+
           return Align(
             alignment: Alignment(m.x * 2 - 1, m.y * 2 - 1),
             child: Transform.translate(
               offset: Offset(0, bob),
-              child: SizedBox(
-                width: 80 * depthScale,
-                height: 80 * depthScale,
-                child: Transform.rotate(
-                  angle: m.heading,
+              child: Transform.rotate(
+                angle: lean,
+                child: SizedBox(
+                  width: 78 * depthScale,
+                  height: 78 * depthScale,
                   child: IgnorePointer(
                     child: ModelViewer(
                       src: useLocalModel ? localEringiModel : fallbackModel,
@@ -132,8 +136,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
                       ar: false,
                       backgroundColor: Colors.transparent,
                       loading: Loading.eager,
-                      // local model が無い環境向け fallback
-                      // model_viewer_plus に onError が無いため URL を使う簡易切替は別画面で実施
+                      cameraOrbit: '${headingDeg.toStringAsFixed(1)}deg 78deg 2.0m',
                     ),
                   ),
                 ),
@@ -150,7 +153,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
               padding: const EdgeInsets.all(10),
               color: Colors.black54,
               child: const Text(
-                '3D World: 群れ徘徊 + 方向回転 + 斜め移動\n※ assets/models/eringi_human.glb を置くと本番モデルに切替',
+                '3D World: 群れ徘徊 + 方向連動 + 個体差スケール + 歩行ゆらぎ\n※ assets/models/eringi_human.glb を使用中',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -169,8 +172,14 @@ class _Mover {
     vy = (r.nextDouble() - 0.5) * 0.12;
     bob = r.nextDouble() * pi * 2;
     heading = 0;
+    gaitPhase = r.nextDouble() * pi * 2;
+    gaitSpeed = 1.4 + r.nextDouble() * 1.8;
+    bodyScale = 0.85 + r.nextDouble() * 0.45;
   }
 
   final int seed;
   late double x, y, vx, vy, bob, heading;
+  late double gaitPhase;
+  late double gaitSpeed;
+  late double bodyScale;
 }
