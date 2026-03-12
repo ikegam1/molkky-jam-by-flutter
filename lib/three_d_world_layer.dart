@@ -26,7 +26,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
   static const String localEringiModel = 'assets/models/eringi_human.glb';
   static const String fallbackModel =
       'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
-  static const bool useLocalModel = false;
+  static const bool useLocalModel = true;
 
   @override
   void initState() {
