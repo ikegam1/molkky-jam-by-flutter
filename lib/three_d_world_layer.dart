@@ -111,34 +111,35 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
         ...movers.map((m) {
           final depthScale = (0.55 + m.y * 0.75) * m.bodyScale;
           final bob = sin(m.bob) * (2.0 + m.bodyScale * 2.0);
-          final lean = sin(m.gaitPhase) * 0.06;
           final headingDeg = (m.heading * 180 / pi) + 90;
+          final walkPitchDeg = sin(m.gaitPhase) * 8.0;
+          final walkRollDeg = cos(m.gaitPhase) * 3.0;
 
           return Align(
             alignment: Alignment(m.x * 2 - 1, m.y * 2 - 1),
             child: Transform.translate(
               offset: Offset(0, bob),
-              child: Transform.rotate(
-                angle: lean,
-                child: SizedBox(
-                  width: 78 * depthScale,
-                  height: 78 * depthScale,
-                  child: IgnorePointer(
-                    child: ModelViewer(
-                      src: useLocalModel ? localEringiModel : fallbackModel,
-                      relatedCss: '''
-                      model-viewer{background-color:transparent;}
-                      ''',
-                      alt: 'Eringi 3D Creature',
-                      cameraControls: false,
-                      autoRotate: false,
-                      disableZoom: true,
-                      disablePan: true,
-                      ar: false,
-                      backgroundColor: Colors.transparent,
-                      loading: Loading.eager,
-                      cameraOrbit: '${headingDeg.toStringAsFixed(1)}deg 78deg 2.0m',
-                    ),
+              child: SizedBox(
+                width: 78 * depthScale,
+                height: 78 * depthScale,
+                child: IgnorePointer(
+                  child: ModelViewer(
+                    src: useLocalModel ? localEringiModel : fallbackModel,
+                    relatedCss: '''
+                    model-viewer{background-color:transparent;}
+                    ''',
+                    alt: 'Eringi 3D Creature',
+                    cameraControls: false,
+                    autoRotate: false,
+                    disableZoom: true,
+                    disablePan: true,
+                    ar: false,
+                    autoPlay: true,
+                    backgroundColor: Colors.transparent,
+                    loading: Loading.eager,
+                    cameraOrbit: '0deg 75deg 2.1m',
+                    orientation:
+                        '${walkPitchDeg.toStringAsFixed(1)}deg ${headingDeg.toStringAsFixed(1)}deg ${walkRollDeg.toStringAsFixed(1)}deg',
                   ),
                 ),
               ),
@@ -154,7 +155,7 @@ class _ThreeDWorldLayerState extends State<ThreeDWorldLayer> {
               padding: const EdgeInsets.all(10),
               color: Colors.black54,
               child: const Text(
-                '3D World: 群れ徘徊 + 方向連動 + 個体差スケール + 歩行ゆらぎ\n※ assets/models/eringi_human.glb を使用中',
+                '3D World: 群れ徘徊 + 向き連動(進行方向) + 疑似歩行アニメ\n※ assets/models/eringi_human.glb を使用中',
                 style: TextStyle(color: Colors.white),
               ),
             ),
