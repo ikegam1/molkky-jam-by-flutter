@@ -67517,7 +67517,7 @@ q=a.c
 m=80*(0.55+m*0.75)
 p=a.r
 p===$&&A.a()
-o=A.tV(new A.uA("https://modelviewer.dev/shared-assets/models/Astronaut.glb","Eringi 3D Creature",B.Da,!1,!1,!0,!0,!1,B.F,"                      model-viewer{background-color:transparent;}\n                      ",n),!0,n)
+o=A.tV(new A.uA("assets/models/eringi_human.glb","Eringi 3D Creature",B.Da,!1,!1,!0,!0,!1,B.F,"                      model-viewer{background-color:transparent;}\n                      ",n),!0,n)
 return new A.hd(new A.dj(r*2-1,q*2-1),n,n,A.ajn(A.aj2(new A.iY(A.auv(p),B.Y,!0,n,o,n),m,m),new A.n(0,s*3.5)),n)},
 $S:447}
 A.q9.prototype={}
