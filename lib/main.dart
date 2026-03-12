@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'models/game_models.dart';
 import 'logic/game_logic.dart';
+import 'three_d_demo_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,16 @@ class _MainGameMenuState extends State<MainGameMenu> {
                 );
               },
               child: const Text('Start 1-Set Match'),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ThreeDDemoScreen()),
+                );
+              },
+              child: const Text('Open 3D Demo (WIP)'),
             ),
           ],
         ),
